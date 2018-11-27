@@ -1,6 +1,14 @@
 // import libraries
 var gpio = require('onoff').Gpio;
-var pin2 = new gpio(2,'out');
+// lampu
+// front motor
+var pin2 = new gpio(2,'in'); 
+var pin3 = new gpio(3,'in'); 
+var pin5 = new gpio(5,'in');
+var pin6 = new gpio(6,'in');
+
+// back motor
+
 // ===============================
 var Pusher = require('pusher-client');
 var pusher = new Pusher('2dddb6b3158434b9c126',{
@@ -8,15 +16,25 @@ var pusher = new Pusher('2dddb6b3158434b9c126',{
 });
 // ===============================
 var request = require('request');
+var sizeof = require('object-sizeof');
+var os = require('os-utils');
 // ===============================
 // declare global variable
 var url = "http://skripsi-azwar.ardata.co.id/";
 var token = null;
+var bandwidth = 0;
+var cpuUsage = 0;
+var memoryUsage = 0;
 
 module.exports = {
 	get: function(req,res) {
 		// do something
 		console.log('please wait passport security on proccess');
+		
+		os.cpuUsage(val=>{
+			cpuUsage = val;
+		});
+		
 		request.get({url:url+'api/clients/2',json:true},function(err,resp,body){
 			console.log('secret client ready! \n\n',body.secret,'\n\n');
 			request.post({
@@ -31,8 +49,8 @@ module.exports = {
 				}
 			},function(err,res,body){
 				console.log('token ready! \n\n',body.access_token,'\n\n\n');
+				console.log('now we will listen on our single channel of connection...');
 				token = body.access_token;
-				console.log(new Date().toLocaleString());
 			});
 		});
 		
@@ -41,16 +59,26 @@ module.exports = {
 		channel.bind('App\\Events\\DataPusherEvent', function(data) {
 			
 			var date = new Date();  	
+			
+			bandwidth += sizeof(data);
+			memoryUsage = os.totalmem() - os.freemem();
 			 			
-			console.log(date.toString(),data);
+			console.log('New data recieved at ',date.toString(),' with : ',data,'\n','estimate bandwidth used : ',bandwidth,' Bytes\n','estimate cpu usage : ',cpuUsage,'%\n','estimate memory used : ',memoryUsage,' Bytes\n');
 			
 			if (data.message == 'forward') {
-				pin2.writeSync(1);
+				var pin2 = new gpio(2,'out'); 
+				var pin3 = new gpio(3,'in'); 
+				var pin5 = new gpio(5,'out');
+				var pin6 = new gpio(6,'in');
 			} else if(data.message == 'stop'){
-				pin2.writeSync(0);
+				var pin2 = new gpio(2,'in'); 
+				var pin3 = new gpio(3,'in'); 
+				var pin5 = new gpio(5,'in');
+				var pin6 = new gpio(6,'in');
+
 			}
 			
-			console.log('data will sent to server again, please wait...');
+			console.log('\ndata will sent to server again, please wait...\n');
 			
 			request.post({
 				url:url+'api/sockets',
@@ -61,12 +89,14 @@ module.exports = {
 				},
 				body:{
 					user_id:1,
-					name:'pengiriman data',
 					value:data.message,
-					date:date.toDateString()
+					date:date.toLocaleString(),
+					bandwidth_usage:bandwidth,
+					cpu_usage:cpuUsage,
+					memory_usage:memoryUsage
 				}
 			},function(err,resp,body){
-				console.log(body);
+				console.log('result :\n',body,'\n\n');
 			});
 			
 		});
